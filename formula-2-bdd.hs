@@ -1,8 +1,12 @@
+import Data.List
 import Data.List.Split
-import Debug.Trace
 import System.Environment
 import System.Exit
 import System.IO
+
+----------------------------------------------------------
+--                  Type definitions                    --
+----------------------------------------------------------
 
 type Result a = Either String a
 
@@ -25,7 +29,7 @@ instance Show Literal where
 
 data Clause = Clause {
 	literals :: [Literal]
-}
+} deriving Eq
 instance Show Clause where
 	show (Clause (lit:[])) = show lit
 	show (Clause (lit:lits)) = (show lit) ++ (',':(show (Clause lits)))
@@ -71,6 +75,34 @@ instance Show TruthTable where
 					then ['1', ' '] ++ (showTruthValues lits)
 					else ['0', ' '] ++ (showTruthValues lits)
 
+data Bdd =
+	Nonterminal {
+		bvar :: Variable,
+		blow :: Bdd,
+		bhigh :: Bdd
+	} |
+	Terminal {
+		bval :: Bool
+	}
+instance Show Bdd where
+	show (Terminal val) =
+		if val
+			then ['1']
+			else ['0']
+	show (Nonterminal bvar low high) = showPath (Nonterminal bvar low high) []
+		where
+			showPath (Nonterminal bvar low high) path =
+				showPath low (path ++ [Literal bvar False]) ++
+				showPath high (path ++ [Literal bvar True])
+			showPath (Terminal val) [] =
+				if val
+					then ['1', '\n']
+					else ['0', '\n']
+			showPath t (lit:lits) =
+				if val lit
+					then [var lit] ++ "=>" ++ (showPath t lits)
+					else [var lit] ++ "->" ++ (showPath t lits)
+
 ----------------------------------------------------------
 --                  Utility functions                   --
 ----------------------------------------------------------
@@ -104,6 +136,23 @@ isSublistOf (x:xs) y =
 	if x `elem` y
 		then xs `isSublistOf` y
 		else False
+
+----------------------------------------------------------
+--                Binary decision diagram               --
+----------------------------------------------------------
+
+generateBdd :: TruthTable -> Bdd
+generateBdd (TruthTable vars rows) = generateBdd' vars rows []
+	where
+		generateBdd' :: [Variable] -> [TruthTableRow] -> [Literal] -> Bdd
+		generateBdd' [] ttrows path =
+			case (find (\x -> path `isSublistOf` (literals (ttclause x))) ttrows) of
+				Nothing -> error "Fatal error during construction of BDD!"
+				Just row -> Terminal (ttval row)
+		generateBdd' (var:vars) ttrows path =
+			Nonterminal var
+			(generateBdd' vars ttrows $ path ++ [Literal var False])
+			(generateBdd' vars ttrows $ path ++ [Literal var True])
 
 ----------------------------------------------------------
 --                 Truth table functions                --
@@ -226,7 +275,14 @@ runWithOpts opts = do
 					let tt = generateTruthTable formula
 					putStrLn (show tt)
 					return ExitSuccess
-		PrintBdd -> errorAndFail "NIY"
+		PrintBdd -> do
+			case parseFormula lines of
+				Left err -> errorAndFail err
+				Right formula -> do
+					let tt = generateTruthTable formula
+					let bdd = generateBdd tt
+					putStr (show bdd)
+					return ExitSuccess
 		PrintRbdd -> errorAndFail "NIY"
 
 run :: [String] -> IO ExitCode
