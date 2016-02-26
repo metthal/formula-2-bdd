@@ -83,7 +83,7 @@ data Bdd =
 	} |
 	Terminal {
 		bval :: Bool
-	}
+	} deriving Eq
 instance Show Bdd where
 	show (Terminal val) =
 		if val
@@ -140,6 +140,19 @@ isSublistOf (x:xs) y =
 ----------------------------------------------------------
 --                Binary decision diagram               --
 ----------------------------------------------------------
+
+reduceBdd :: Bdd -> Bdd
+reduceBdd bdd = let newBdd = reduceBdd' bdd in
+	if bdd /= newBdd
+		then reduceBdd' newBdd
+		else bdd
+	where
+		reduceBdd' :: Bdd -> Bdd
+		reduceBdd' (Terminal val) = Terminal val
+		reduceBdd' (Nonterminal var low high) =
+			if low == high
+				then reduceBdd' low
+				else Nonterminal var (reduceBdd' low) (reduceBdd' high)
 
 generateBdd :: TruthTable -> Bdd
 generateBdd (TruthTable vars rows) = generateBdd' vars rows []
@@ -283,7 +296,15 @@ runWithOpts opts = do
 					let bdd = generateBdd tt
 					putStr (show bdd)
 					return ExitSuccess
-		PrintRbdd -> errorAndFail "NIY"
+		PrintRbdd -> do
+			case parseFormula lines of
+				Left err -> errorAndFail err
+				Right formula -> do
+					let tt = generateTruthTable formula
+					let bdd = generateBdd tt
+					let rbdd = reduceBdd bdd
+					putStr (show rbdd)
+					return ExitSuccess
 
 run :: [String] -> IO ExitCode
 run args = do
