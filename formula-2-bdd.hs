@@ -87,8 +87,8 @@ data Bdd =
 instance Show Bdd where
 	show (Terminal val) =
 		if val
-			then ['1']
-			else ['0']
+			then ['1', '\n']
+			else ['0', '\n']
 	show (Nonterminal bvar low high) = showPath (Nonterminal bvar low high) []
 		where
 			showPath (Nonterminal bvar low high) path =
