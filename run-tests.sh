@@ -4,7 +4,7 @@ f2b="./formula-2-bdd"
 tests_dir="tests"
 
 mkdir -p tmp && rm -rf tmp/*
-tests=`find $tests_dir | egrep "\.in$" | xargs -n1 basename | sed -r "s/\.in$//g"`
+tests=`find $tests_dir | egrep "\.in$" | xargs -n1 basename | sed -r "s/\.in$//g" | sort`
 
 compare_test_result() {
 	diff -u "$tests_dir/$1.in" "tmp/$1.in.out" >/dev/null 2>&1
